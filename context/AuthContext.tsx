@@ -1,0 +1,80 @@
+"use client";
+
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+} from "react";
+import type { LoggedInUser } from "@/lib/types";
+import {
+  loginWithFirebase,
+  logoutFirebase,
+  onAuthChange,
+} from "@/lib/firebaseAuth";
+import { isFirebaseReady } from "@/lib/firebase";
+
+interface AuthContextType {
+  user: LoggedInUser | null;
+  login: (email: string, password: string) => Promise<boolean>;
+  logout: () => Promise<void>;
+  isAuthenticated: boolean;
+  authError: string | null;
+  clearAuthError: () => void;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<LoggedInUser | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isFirebaseReady) {
+      const unsubscribe = onAuthChange((authUser) => {
+        setUser(authUser);
+      });
+      return () => unsubscribe();
+    }
+  }, []);
+
+  const login = useCallback(async (email: string, password: string) => {
+    setAuthError(null);
+    const result = await loginWithFirebase(email, password);
+    if (result.success && result.user) {
+      setUser(result.user);
+      return true;
+    }
+    setAuthError(result.success === false ? result.error : null);
+    return false;
+  }, []);
+
+  const logout = useCallback(async () => {
+    await logoutFirebase();
+    setUser(null);
+  }, []);
+
+  const clearAuthError = useCallback(() => setAuthError(null), []);
+
+  const value: AuthContextType = {
+    user,
+    login,
+    logout,
+    isAuthenticated: !!user,
+    authError,
+    clearAuthError,
+  };
+
+  return (
+    <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (ctx === undefined) {
+    throw new Error("useAuth must be used within AuthProvider");
+  }
+  return ctx;
+}
