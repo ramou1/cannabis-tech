@@ -14,9 +14,9 @@ import {
 } from "lucide-react";
 import { registerWithFirebase } from "@/lib/firebaseAuth";
 import { useAuth } from "@/context/AuthContext";
+import { USE_MOCK_AUTH } from "@/lib/authMock";
 import { PAISES, TIPOS_USUARIO } from "@/lib/constants";
 import PasswordInput from "@/components/PasswordInput";
-import { useTranslations } from "@/context/LanguageContext";
 
 function sanitizeName(value: string): string {
   return value.replace(/[^\p{L}\p{N}\s]/gu, "").slice(0, 50);
@@ -24,10 +24,6 @@ function sanitizeName(value: string): string {
 
 function sanitizeCity(value: string): string {
   return value.replace(/[^\p{L}\p{N}\s]/gu, "").slice(0, 40);
-}
-
-function sanitizeDocument(value: string): string {
-  return value.replace(/[^\p{L}\p{N}.\-\/]/gu, "").slice(0, 40);
 }
 
 function onlyDigits(value: string): string {
@@ -42,26 +38,8 @@ function maskCPF(value: string): string {
   return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
 }
 
-function maskCNPJ(value: string): string {
-  const d = onlyDigits(value).slice(0, 14);
-  if (d.length <= 2) return d;
-  if (d.length <= 5) return `${d.slice(0, 2)}.${d.slice(2)}`;
-  if (d.length <= 8) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5)}`;
-  if (d.length <= 12)
-    return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8)}`;
-  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
-}
-
-const TIPOS_DOCUMENTO = [
-  { value: "cpf", labelKey: "documentoTipoCpf" as const },
-  { value: "cnpj", labelKey: "documentoTipoCnpj" as const },
-  { value: "id", labelKey: "documentoTipoId" as const },
-  { value: "passaporte", labelKey: "documentoTipoPassaporte" as const },
-] as const;
-
 const MAX_NOME = 50;
 const MAX_CIDADE = 40;
-const MAX_DOCUMENTO = 40;
 
 const inputClass =
   "w-full px-4 py-2.5 bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent";
@@ -75,10 +53,59 @@ const TIPO_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
   governo: Landmark,
 };
 
+const tr = {
+  cadastro: {
+    voltar: "Voltar",
+    nome: "Nome completo",
+    email: "E-mail",
+    telefone: "Telefone",
+    codigoPaisPlaceholder: "ex: 55",
+    areaNumeroPlaceholder: "ex: 11 99999-9999",
+    pais: "País",
+    paisPlaceholder: "Selecione o país",
+    documento: "CPF",
+    documentoPlaceholderCpf: "000.000.000-00",
+    tipoUsuario: "Tipo de usuário",
+    senha: "Senha",
+    senhaPlaceholder: "Mínimo 6 caracteres",
+    confirmarSenha: "Confirmar senha",
+    confirmarSenhaPlaceholder: "Repita a senha",
+    jaTemConta: "Já tem uma conta?",
+    entrar: "Entrar",
+    sucesso: "Conta criada com sucesso!",
+    redirecionando: "Redirecionando para a página inicial...",
+    erroSenhasDiferentes: "As senhas não coincidem.",
+    erroSenhaCurta: "A senha deve ter pelo menos 6 caracteres.",
+    erroTipoUsuario: "Selecione o tipo de usuário.",
+    erroGenerico: "Erro ao criar conta.",
+    erroEmailEmUso: "Este e-mail já está em uso.",
+    erroDocumentoObrigatorio: "Preencha o CPF.",
+    erroCpfInvalido: "CPF deve ter 11 dígitos.",
+  },
+  cadastroTipos: {
+    estudante: "Estudante",
+    medico: "Médico",
+    professor: "Professor",
+    farmaceutico: "Farmacêutico",
+    corporacao: "Corporação",
+    governo: "Governo",
+  },
+  cadastroSteps: {
+    dadosPessoaisTitulo: "Dados pessoais",
+    dadosPessoaisSubtitulo: "Informe seus dados de identificação",
+    acessoTitulo: "Acesso",
+    acessoSubtitulo: "Crie seu e-mail e senha de acesso",
+    continuar: "Continuar",
+    concluir: "Concluir cadastro",
+    voltar: "Voltar",
+    cidade: "Cidade",
+    cidadePlaceholder: "Sua cidade",
+  },
+} as const;
+
 export default function CadastroPage() {
   const router = useRouter();
   const { login } = useAuth();
-  const tr = useTranslations();
   const [step, setStep] = useState<1 | 2>(1);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -86,9 +113,6 @@ export default function CadastroPage() {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [pais, setPais] = useState("");
   const [cidade, setCidade] = useState("");
-  const [tipoDocumento, setTipoDocumento] = useState<
-    "cpf" | "cnpj" | "id" | "passaporte" | ""
-  >("");
   const [documento, setDocumento] = useState("");
   const [tipoUsuario, setTipoUsuario] = useState("");
   const [password, setPassword] = useState("");
@@ -99,21 +123,13 @@ export default function CadastroPage() {
 
   const validateStep1 = () => {
     setError("");
-    if (!tipoDocumento) {
-      setError(tr.cadastro.erroTipoDocumento);
-      return false;
-    }
     if (!documento.trim()) {
       setError(tr.cadastro.erroDocumentoObrigatorio);
       return false;
     }
     const digits = onlyDigits(documento);
-    if (tipoDocumento === "cpf" && digits.length !== 11) {
+    if (digits.length !== 11) {
       setError(tr.cadastro.erroCpfInvalido);
-      return false;
-    }
-    if (tipoDocumento === "cnpj" && digits.length !== 14) {
-      setError(tr.cadastro.erroCnpjInvalido);
       return false;
     }
     if (!tipoUsuario) {
@@ -146,18 +162,20 @@ export default function CadastroPage() {
     if (!validateStep2()) return;
     setError("");
     setSubmitting(true);
-    const result = await registerWithFirebase({
-      email,
-      password,
-      name,
-      telefone:
-        [phoneCountryCode.trim(), phoneNumber.trim()].filter(Boolean).join(" ") ||
-        undefined,
-      pais: pais || undefined,
-      cidade: cidade || undefined,
-      documento: documento || undefined,
-      tipoUsuario,
-    });
+    const result = USE_MOCK_AUTH
+      ? ({ success: true as const } as { success: true })
+      : await registerWithFirebase({
+          email,
+          password,
+          name,
+          telefone:
+            [phoneCountryCode.trim(), phoneNumber.trim()].filter(Boolean).join(" ") ||
+            undefined,
+          pais: pais || undefined,
+          cidade: cidade || undefined,
+          documento: documento || undefined,
+          tipoUsuario,
+        });
     setSubmitting(false);
 
     if (result.success) {
@@ -219,6 +237,11 @@ export default function CadastroPage() {
         <div className="w-full max-w-lg mx-auto">
           <div className="flex justify-center mb-6">
             <Link href="/" className="flex items-center gap-2">
+              <img
+                src="/images/logo01.png"
+                alt="Cannabis Tech"
+                className="h-10 w-auto object-contain"
+              />
               <span className="text-2xl font-bold text-white">Cannabis</span>
               <span className="text-2xl font-bold text-[var(--color-primary-light)]">Tech</span>
             </Link>
@@ -233,7 +256,7 @@ export default function CadastroPage() {
             />
           </div>
 
-          <h1 className="text-2xl font-semibold text-white text-center mb-2">
+          <h1 className="text-2xl font-semibold text-white text-center mb-2 uppercase tracking-wider">
             {step === 1 && tr.cadastroSteps.dadosPessoaisTitulo}
             {step === 2 && tr.cadastroSteps.acessoTitulo}
           </h1>
@@ -315,59 +338,16 @@ export default function CadastroPage() {
                 <label className="block text-sm font-medium text-gray-300 mb-1">
                   {tr.cadastro.documento}
                 </label>
-                <select
-                  id="cadastro-tipo-documento"
-                  value={tipoDocumento}
-                  onChange={(e) => {
-                    const v = e.target.value as
-                      | ""
-                      | "cpf"
-                      | "cnpj"
-                      | "id"
-                      | "passaporte";
-                    setTipoDocumento(v);
-                    setDocumento("");
-                  }}
+                <input
+                  id="cadastro-documento"
+                  type="text"
+                  value={documento}
+                  onChange={(e) => setDocumento(maskCPF(e.target.value))}
+                  maxLength={14}
+                  className={`${inputClass} mt-2`}
+                  placeholder={tr.cadastro.documentoPlaceholderCpf}
                   required
-                  className={inputClass}
-                >
-                  <option value="">{tr.cadastro.documentoTipoPlaceholder}</option>
-                  {TIPOS_DOCUMENTO.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {tr.cadastro[t.labelKey]}
-                    </option>
-                  ))}
-                </select>
-                {tipoDocumento && (
-                  <input
-                    id="cadastro-documento"
-                    type="text"
-                    value={documento}
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      if (tipoDocumento === "cpf") setDocumento(maskCPF(raw));
-                      else if (tipoDocumento === "cnpj")
-                        setDocumento(maskCNPJ(raw));
-                      else setDocumento(sanitizeDocument(raw));
-                    }}
-                    maxLength={
-                      tipoDocumento === "cpf"
-                        ? 14
-                        : tipoDocumento === "cnpj"
-                          ? 18
-                          : MAX_DOCUMENTO
-                    }
-                    className={`${inputClass} mt-2`}
-                    placeholder={
-                      tipoDocumento === "cpf"
-                        ? tr.cadastro.documentoPlaceholderCpf
-                        : tipoDocumento === "cnpj"
-                          ? tr.cadastro.documentoPlaceholderCnpj
-                          : tr.cadastro.documentoPlaceholder
-                    }
-                    required
-                  />
-                )}
+                />
               </div>
 
               <div>

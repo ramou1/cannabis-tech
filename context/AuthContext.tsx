@@ -14,6 +14,7 @@ import {
   onAuthChange,
 } from "@/lib/firebaseAuth";
 import { isFirebaseReady } from "@/lib/firebase";
+import { USE_MOCK_AUTH } from "@/lib/authMock";
 
 interface AuthContextType {
   user: LoggedInUser | null;
@@ -31,7 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isFirebaseReady) {
+    if (!USE_MOCK_AUTH && isFirebaseReady) {
       const unsubscribe = onAuthChange((authUser) => {
         setUser(authUser);
       });
@@ -41,6 +42,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     setAuthError(null);
+    if (USE_MOCK_AUTH) {
+      // Mock: autentica sem chamar Firebase (para validar UI/conteúdo agora).
+      if (!email.trim() || password.length < 1) {
+        setAuthError("Credenciais inválidas.");
+        return false;
+      }
+
+      // Nome simples; pode ser expandido no futuro quando o registro real estiver pronto.
+      const nameFromEmail = email.split("@")[0]?.replace(/[._-]+/g, " ") || "Usuário";
+      const prettyName =
+        nameFromEmail
+          .split(" ")
+          .filter(Boolean)
+          .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
+          .join(" ") || "Usuário";
+
+      setUser({
+        id: "mock-user",
+        email,
+        name: prettyName,
+        role: "user",
+      });
+      return true;
+    }
+
     const result = await loginWithFirebase(email, password);
     if (result.success && result.user) {
       setUser(result.user);
@@ -51,7 +77,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    await logoutFirebase();
+    if (!USE_MOCK_AUTH) {
+      await logoutFirebase();
+    }
     setUser(null);
   }, []);
 

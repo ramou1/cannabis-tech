@@ -3,9 +3,10 @@
 @theme {
   --font-sans: var(--font-inter);
   --font-display: var(--font-inter);
-  --color-primary: #15803d;
+  --color-primary: #215235;
   --color-primary-hover: #166534;
   --color-primary-light: #22c55e;
+  --color-cyan: #22d3ee;
 }
 
 @layer base {
@@ -18,7 +19,7 @@
   body {
     background: #0F0F0F;
     color: #ffffff;
-    font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: var(--font-inter);
     overflow-x: hidden;
   }
 
