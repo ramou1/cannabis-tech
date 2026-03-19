@@ -5,9 +5,10 @@ import {
   Landmark,
   Wrench,
 } from "lucide-react";
+import type { ReactElement } from "react";
 
 type IconProps = { className?: string };
-type IconComponent = (props: IconProps) => JSX.Element;
+type IconComponent = (props: IconProps) => ReactElement;
 
 export default function ModelosMonetizacao() {
   const leftCards = [

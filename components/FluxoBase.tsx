@@ -7,10 +7,11 @@ import {
   Stethoscope,
   UserPlus,
 } from "lucide-react";
+import type { ReactElement } from "react";
 
 const iconClass = "w-6 h-6";
 type IconProps = { className?: string };
-type IconComponent = (props: IconProps) => JSX.Element;
+type IconComponent = (props: IconProps) => ReactElement;
 
 export default function FluxoBase() {
   const steps: Array<{
